@@ -36,7 +36,15 @@ def rot_center(image, angle, x, y):
 
     return rotated_image, new_rect
 
-
+def check_sides(rect1: pygame.Rect, rect2: pygame.Rect) -> str:
+    if rect1.midtop[1] > rect2.midtop[1]:
+        return "top"
+    elif rect1.midleft[0] > rect2.midleft[0]:
+        return "left"
+    elif rect1.midright[0] < rect2.midright[0]:
+        return "right"
+    else:
+        return "bottom"
   
 BASE_SIZE = (640, 480)
 PI = 3.1415
