@@ -84,6 +84,9 @@ class Game:
                     for i, state in enumerate(self.gsm.states):
                         print(i, state)
 
+            if event.type == pygame.USEREVENT + 1:
+                pygame.image.save(self.screen, "collision_point.jpg")
+
     def play(self):
         print("Playing Game!")
         self.transition(TestState())

@@ -45,6 +45,12 @@ def check_sides(rect1: pygame.Rect, rect2: pygame.Rect) -> str:
         return "right"
     else:
         return "bottom"
+
+def circle_intersection(pos1: pygame.Vector2, pos2: pygame.Vector2, radius) -> bool:
+    dx = pos1.x - pos2.x;
+    dy = pos1.y - pos2.y;
+    r = radius * 2
+    return dx * dx + dy * dy <= (r * r);
   
 BASE_SIZE = (640, 480)
 PI = 3.1415
