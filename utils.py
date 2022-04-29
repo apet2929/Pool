@@ -47,11 +47,24 @@ def check_sides(rect1: pygame.Rect, rect2: pygame.Rect) -> str:
         return "bottom"
 
 def circle_intersection(pos1: pygame.Vector2, pos2: pygame.Vector2, radius) -> bool:
-    dx = pos1.x - pos2.x;
-    dy = pos1.y - pos2.y;
+    dx = pos1.x - pos2.x
+    dy = pos1.y - pos2.y
     r = radius * 2
-    return dx * dx + dy * dy <= (r * r);
+    return dx * dx + dy * dy <= (r * r)
   
+def normalize_angle_deg(degrees: float):
+    return (degrees % 360 + 360) % 360
+
+def normalize_angle_rads(radians: float):
+    twopi = math.pi * 2
+    return (radians % twopi + twopi) % twopi
+
+def angle_to_horizontal(vec: pygame.Vector2) -> float:
+    # Returns angle to horizontal in radians
+    return vec.angle_to(HORIZONTAL)
+
+
 BASE_SIZE = (640, 480)
 PI = 3.1415
 TWOPI = PI * 2
+HORIZONTAL = pygame.Vector2(1,0)

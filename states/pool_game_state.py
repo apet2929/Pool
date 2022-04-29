@@ -6,7 +6,7 @@ from states.state import State
 from pygame import Rect, Vector2
 import pygame
 
-from utils import BASE_SIZE, check_sides, circle_intersection
+from utils import BASE_SIZE, check_sides, circle_intersection, normalize_angle_rads
 
 class Ball(Entity):
     FRICTION = 0.02
@@ -36,6 +36,9 @@ class Ball(Entity):
             self.velocity.y = 0
         super().update(delta, **kwargs)
 
+    def get_momentum(self):
+        return self.mass * self.velocity
+
     def apply_force(self, force: Vector2):
         self.forces.append(force)
 
@@ -44,34 +47,6 @@ class Ball(Entity):
         for force in self.forces:
             s += force
         return s
-
-    def collide_balls(self, delta, balls):
-        # Sweep through time to find the initial intersection point
-        future = self.get_pos_at_time(delta)
-        future_rect = self.get_rect()
-        future_rect.center = [future.x, future.y]
-        for ball in balls:
-            if ball == self:
-                continue
-            ball_future = ball.get_pos_at_time(delta)
-            ball_rect = ball.get_rect()
-            ball_rect.center = [ball_future.x, ball_future.y]
-            if future_rect.colliderect(ball_rect): # Fast rectangle collision test
-                # Perform a better test
-                if circle_intersection(future, ball.get_pos_at_time(delta), Ball.RADIUS) and ball.velocity.magnitude() == 0:
-                    # Sweep back in time
-
-                    intersected_time = self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
-                    if(intersected_time is not None):
-                        my_int_pos = self.get_pos_at_time(intersected_time)
-                        ball_int_pos = ball.get_pos_at_time(intersected_time)
-                        difference = my_int_pos - ball_int_pos
-                        tangent_slope = math.degrees(math.atan2(difference.y,difference.x)) + 90
-
-                        print("Balls collided!")
-                        print(my_int_pos, ball_int_pos, tangent_slope)
-                        self.apply_collision_force(ball, tangent_slope)
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT + 1))
 
     def sweep_circle(self, delta, ball):
         current_time = delta
@@ -87,7 +62,7 @@ class Ball(Entity):
                 return current_time
         print("Sweep failed! No time found where intersection absent")    
 
-    def get_pos_at_time(self, delta):
+    def get_pos_at_time(self, delta) -> Vector2:
         return self.position + (self.velocity * delta)
 
     def collide_walls(self, delta, walls: list[Rect]):
@@ -117,24 +92,59 @@ class Ball(Entity):
             self.position.x = my_rect.centerx
             self.position.y = my_rect.centery
 
-    def apply_collision_force(self, other, collision_normal):
-        a = (self.velocity.angle_to(Vector2(1,0))) - collision_normal
-        
-        momentum_transfered_percent = math.sin(math.radians(a))
-        initial_velocity_magnitude = self.velocity.magnitude()
-        my_final_velocity_mag = initial_velocity_magnitude * (1 - momentum_transfered_percent)
-        other_final_velocity_mag = initial_velocity_magnitude * momentum_transfered_percent
-        my_result_angle = math.radians(collision_normal)
-        other_result_angle = math.radians(collision_normal - 90)
-        my_new_momentum = Vector2(my_final_velocity_mag * math.cos(my_result_angle), my_final_velocity_mag * math.sin(my_result_angle))
-        other_new_momentum = Vector2(other_final_velocity_mag * math.cos(other_result_angle), other_final_velocity_mag * math.sin(other_result_angle))
+    def collide_balls(self, delta, balls):
+            # Sweep through time to find the initial intersection point
+            future = self.get_pos_at_time(delta)
+            future_rect = self.get_rect()
+            future_rect.center = [future.x, future.y]
+            for ball in balls:
+                if ball == self:
+                    continue
+                ball_future = ball.get_pos_at_time(delta)
+                ball_rect = ball.get_rect()
+                ball_rect.center = [ball_future.x, ball_future.y]
+                if future_rect.colliderect(ball_rect): # Fast rectangle collision test
+                    # Perform a better test
+                    if circle_intersection(future, ball.get_pos_at_time(delta), Ball.RADIUS) and ball.velocity.magnitude() == 0:
+                        # Sweep back in time
 
-        my_change_momentum = my_new_momentum - self.velocity
-        other_change_momentum = other.velocity - other_new_momentum 
-        self.apply_force(my_change_momentum)
-        other.apply_force(other_change_momentum)
-        print(my_final_velocity_mag, other_final_velocity_mag, my_change_momentum, other_change_momentum)
-        print(a, momentum_transfered_percent, math.degrees(my_result_angle), math.degrees(other_result_angle))
+                        intersected_time = self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
+                        if(intersected_time is not None):
+                            my_int_pos = self.get_pos_at_time(intersected_time)
+                            ball_int_pos = ball.get_pos_at_time(intersected_time)
+                            difference: Vector2 = my_int_pos - ball_int_pos
+                            
+                            tangent_slope = math.atan2(difference.y, difference.x) + math.pi/2
+                            tangent_slope = normalize_angle_rads(tangent_slope)
+
+                            print("Balls collided!")
+                            print(my_int_pos, ball_int_pos, math.degrees(tangent_slope))
+                            self.apply_collision_force(ball, tangent_slope)
+                            pygame.event.post(pygame.event.Event(pygame.USEREVENT + 1))
+
+    def apply_collision_force(self, other, collision_normal):
+        my_result_angle = collision_normal - math.pi
+        other_result_angle = collision_normal - math.pi/2
+
+        print(f"my_result_angle={math.degrees(my_result_angle)}")
+        print(f"other_result_angle={math.degrees(other_result_angle)}")
+
+        momentum_initial = self.get_momentum().magnitude()
+        my_momentum_final = momentum_initial * math.cos(my_result_angle)
+        other_momentum_final = momentum_initial * math.sin(collision_normal)
+
+        print(f"initial_momentum={momentum_initial}")
+        print(f"my_momentum_final={my_momentum_final}")
+        print(f"other_momentum_final={other_momentum_final}")
+
+        my_change_momentum = my_momentum_final - momentum_initial 
+        other_change_momentum = other_momentum_final - other.get_momentum().magnitude()
+
+        print(f"my_change_momentum={my_change_momentum}")
+        print(f"other_change_momentum={other_change_momentum}")
+
+        self.apply_force(Vector2(my_change_momentum * math.sin(my_result_angle), my_change_momentum * math.cos(my_result_angle)))
+        other.apply_force(Vector2(other_change_momentum * math.cos(other_result_angle), other_change_momentum * math.sin(other_result_angle)))
 
     def apply_friction(self):
         self.apply_force(self.velocity * -Ball.FRICTION)
@@ -187,6 +197,9 @@ class PoolGameState(State):
                 difference *= 2
                 self.getCueBall().apply_force(difference)
                 self.aim = None
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_o:
+                    self.run_test(180)
         
         for ball in self.balls:
             ball.update(delta, walls=self.walls, balls=self.balls)
@@ -204,3 +217,14 @@ class PoolGameState(State):
     def draw_walls(self, screen):
         for wall in self.walls:
             pygame.draw.rect(screen, (0,255,0), wall)
+
+    def run_test(self, launch_angle):
+        a = math.radians(launch_angle)
+        self.balls[0].position = Vector2(300,200)
+        self.balls[1].position = Vector2(300,400)
+
+        self.balls[0].velocity = Vector2(0,0)
+        self.balls[1].velocity = Vector2(0,0)
+
+        self.balls[0].apply_force(Vector2(1000 * math.sin(a), 1000 * math.cos(a)))
+        
