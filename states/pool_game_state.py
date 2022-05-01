@@ -30,10 +30,6 @@ class Ball(Entity):
 
         self.collide_walls(delta, kwargs["walls"])
         self.collide_balls(delta, kwargs["balls"])
-
-        if self.velocity.magnitude_squared() < 0.001:
-            self.velocity.x = 0
-            self.velocity.y = 0
         super().update(delta, **kwargs)
 
     def get_momentum(self):
@@ -110,10 +106,12 @@ class Ball(Entity):
 
                         intersected_time = self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
                         
-                        if(intersected_time is not None):
-                            self.position = self.get_pos_at_time(intersected_time)
-                            ball.position = ball.get_pos_at_time(intersected_time)
-                            self.collide_ball(ball, intersected_time)
+                        if(intersected_time is None):
+                            intersected_time = 5 * delta
+                        self.position = self.get_pos_at_time(intersected_time)
+                        ball.position = ball.get_pos_at_time(intersected_time)
+                        self.collide_ball(ball, intersected_time)
+                        
                             
     def collide_ball(self, other, dt):
         difference: Vector2 = self.position - other.position
@@ -138,6 +136,12 @@ class Ball(Entity):
         self.velocity = svn_vector + svt_vector
         other.velocity = ovn_vector + ovt_vector
 
+    def fix_intersection(self, ball):
+        difference: Vector2 = self.position - ball.position
+        optimal_difference = difference.normalize() * Ball.RADIUS * 2
+        # Push both balls out
+        self.position += (optimal_difference / 2)
+        ball.position += (optimal_difference / 2)
 
     def apply_friction(self):
         self.apply_force(self.velocity * -Ball.FRICTION)
