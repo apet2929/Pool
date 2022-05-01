@@ -10,8 +10,8 @@ from utils import BASE_SIZE, check_sides, circle_intersection, normalize_angle_r
 
 class Ball(Entity):
     FRICTION = 0.02
-    RADIUS = 20
-    def __init__(self, image: pygame.Surface, position, mass) -> None:
+    RADIUS = 15
+    def __init__(self, image: pygame.Surface, position, mass=1) -> None:
         super().__init__(image, (Ball.RADIUS * 2, Ball.RADIUS * 2), position)
         self.mass: float = mass
         self.velocity: Vector2 = Vector2(0,0)
@@ -51,7 +51,7 @@ class Ball(Entity):
     def sweep_circle(self, delta, ball):
         current_time = delta
         intersected = True
-        while current_time > -(delta * 2) and intersected:
+        while current_time > -(delta * 3) and intersected:
             self_cur_pos = self.get_pos_at_time(current_time)
             other_cur_pos = ball.get_pos_at_time(current_time)
             if circle_intersection(self_cur_pos, other_cur_pos, Ball.RADIUS):
@@ -109,14 +109,13 @@ class Ball(Entity):
                         # Sweep back in time
 
                         intersected_time = self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
+                        
                         if(intersected_time is not None):
-                            self.collide(ball, intersected_time)
-                            print("Balls collided!")
-                            pygame.event.post(pygame.event.Event(pygame.USEREVENT + 1))
-
-    def collide(self, other, dt):
-        self.position = self.get_pos_at_time(dt)
-        other.position = other.get_pos_at_time(dt)
+                            self.position = self.get_pos_at_time(intersected_time)
+                            ball.position = ball.get_pos_at_time(intersected_time)
+                            self.collide_ball(ball, intersected_time)
+                            
+    def collide_ball(self, other, dt):
         difference: Vector2 = self.position - other.position
         unit_normal = difference.normalize()
         unit_tangent = Vector2(-unit_normal.y, unit_normal.x)
@@ -157,8 +156,7 @@ class PoolGameState(State):
         self.walls: list[Rect] = []
 
     def on_enter(self, ass_cache: AssetCache):
-        self.balls.append(Ball(ass_cache.get_asset("CropSprite"), (200,200), 1))
-        self.balls.append(Ball(ass_cache.get_asset("CropSprite"), (400,200), 1))
+        self.init_balls(ass_cache)
         # self.balls[0].apply_force(Vector2(10, 10))
         self.init_walls()
 
@@ -189,7 +187,7 @@ class PoolGameState(State):
             if event.type == pygame.MOUSEBUTTONUP:
                 difference =  self.aim - self.getCueBall().position
                 difference *= 2
-                self.getCueBall().apply_force(difference)
+                self.getCueBall().apply_force(difference * self.getCueBall().mass)
                 self.aim = None
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_o:
@@ -207,6 +205,35 @@ class PoolGameState(State):
         self.walls.append(Rect(0,BASE_SIZE[1] - width,BASE_SIZE[0], width)) # bottom
         self.walls.append(Rect(0,0,width, BASE_SIZE[1])) # left
         self.walls.append(Rect(BASE_SIZE[0]-width,0,width, BASE_SIZE[1])) # right
+
+    def init_balls(self, ass_cache):
+        w = BASE_SIZE[0]
+        h = BASE_SIZE[1]
+        r = Ball.RADIUS
+        d = Ball.RADIUS * 2
+        self.balls.append(Ball(ass_cache.get_asset("CropSprite"), (w/4,h/2), 1.005)) 
+        # self.balls.append(Ball(ass_cache.get_asset("CropSprite"), (400,200), 1))
+        balls = [
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4,h/2)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + d,h/2 + r)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + d,h/2 - r)),
+
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 2*d, h/2)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 2*d, h/2 - d)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 2*d, h/2 + d)),
+
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 3*d, h/2 + r)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 3*d, h/2 - r)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 3*d, h/2 + d+r)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 3*d, h/2 - d-r)),
+
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2 + d)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2 - d)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2 + 2*d)),
+            Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2 - 2*d)),
+        ]
+        self.balls.extend(balls)
 
     def draw_walls(self, screen):
         for wall in self.walls:
