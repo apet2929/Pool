@@ -105,46 +105,40 @@ class Ball(Entity):
                 ball_rect.center = [ball_future.x, ball_future.y]
                 if future_rect.colliderect(ball_rect): # Fast rectangle collision test
                     # Perform a better test
-                    if circle_intersection(future, ball.get_pos_at_time(delta), Ball.RADIUS) and ball.velocity.magnitude() == 0:
+                    if circle_intersection(future, ball.get_pos_at_time(delta), Ball.RADIUS):
                         # Sweep back in time
 
                         intersected_time = self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
                         if(intersected_time is not None):
-                            my_int_pos = self.get_pos_at_time(intersected_time)
-                            ball_int_pos = ball.get_pos_at_time(intersected_time)
-                            difference: Vector2 = my_int_pos - ball_int_pos
-                            
-                            tangent_slope = math.atan2(difference.y, difference.x) + math.pi/2
-                            tangent_slope = normalize_angle_rads(tangent_slope)
-
+                            self.collide(ball, intersected_time)
                             print("Balls collided!")
-                            print(my_int_pos, ball_int_pos, math.degrees(tangent_slope))
-                            self.apply_collision_force(ball, tangent_slope)
                             pygame.event.post(pygame.event.Event(pygame.USEREVENT + 1))
 
-    def apply_collision_force(self, other, collision_normal):
-        my_result_angle = collision_normal - math.pi
-        other_result_angle = collision_normal - math.pi/2
+    def collide(self, other, dt):
+        self.position = self.get_pos_at_time(dt)
+        other.position = other.get_pos_at_time(dt)
+        difference: Vector2 = self.position - other.position
+        unit_normal = difference.normalize()
+        unit_tangent = Vector2(-unit_normal.y, unit_normal.x)
 
-        print(f"my_result_angle={math.degrees(my_result_angle)}")
-        print(f"other_result_angle={math.degrees(other_result_angle)}")
+        # Tangent and normal components of initial velocity (scalar)
+        self_vel_tangent = unit_tangent.dot(self.velocity)
+        self_vel_normal = unit_normal.dot(self.velocity)
+        other_vel_tangent = unit_tangent.dot(other.velocity)
+        other_vel_normal = unit_normal.dot(other.velocity)
+        
+        self_vel_normal_final = ((self_vel_normal)*(self.mass - other.mass) + (2*other.mass*other_vel_normal)) / (self.mass + other.mass)
+        other_vel_normal_final = ((other_vel_normal)*(other.mass - self.mass) + (2*self.mass*self_vel_normal)) / (self.mass + other.mass)
 
-        momentum_initial = self.get_momentum().magnitude()
-        my_momentum_final = momentum_initial * math.cos(my_result_angle)
-        other_momentum_final = momentum_initial * math.sin(collision_normal)
+        # Self/other velocity normal/tangent as vectors
+        svn_vector = self_vel_normal_final * unit_normal
+        svt_vector = self_vel_tangent * unit_tangent
+        ovn_vector = other_vel_normal_final * unit_normal
+        ovt_vector = other_vel_tangent * unit_tangent
 
-        print(f"initial_momentum={momentum_initial}")
-        print(f"my_momentum_final={my_momentum_final}")
-        print(f"other_momentum_final={other_momentum_final}")
+        self.velocity = svn_vector + svt_vector
+        other.velocity = ovn_vector + ovt_vector
 
-        my_change_momentum = my_momentum_final - momentum_initial 
-        other_change_momentum = other_momentum_final - other.get_momentum().magnitude()
-
-        print(f"my_change_momentum={my_change_momentum}")
-        print(f"other_change_momentum={other_change_momentum}")
-
-        self.apply_force(Vector2(my_change_momentum * math.sin(my_result_angle), my_change_momentum * math.cos(my_result_angle)))
-        other.apply_force(Vector2(other_change_momentum * math.cos(other_result_angle), other_change_momentum * math.sin(other_result_angle)))
 
     def apply_friction(self):
         self.apply_force(self.velocity * -Ball.FRICTION)
