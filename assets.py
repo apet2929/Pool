@@ -7,7 +7,8 @@ class AssetManager:
     def __init__(self) -> None:
         self.assets = {
             "NOT_FOUND": resource_path("assets/not_found.jpg"),
-            "CropSprite": resource_path("assets/cabbage.png")
+            "CropSprite": resource_path("assets/cabbage.png"),
+            "Table": resource_path("assets/pool_table.jpg")
         }
     
     def get_asset_path(self, name):

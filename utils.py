@@ -1,3 +1,4 @@
+from operator import truediv
 import sys
 import os.path
 import math
@@ -63,6 +64,17 @@ def angle_to_horizontal(vec: pygame.Vector2) -> float:
     # Returns angle to horizontal in radians
     return vec.angle_to(HORIZONTAL)
 
+def is_circle_inside_circle(inner_pos, inner_radius, outer_pos, outer_radius):
+    # Returns whether circle 2
+    # source: https://stackoverflow.com/questions/33490334/check-if-a-circle-is-contained-in-another-circle
+    x1 = outer_pos[0]
+    y1 = outer_pos[1]
+
+    x2 = inner_pos[0]
+    y2 = inner_pos[1]
+
+    d = math.sqrt(pow((x2 - x1), 2) + pow(y2 - y1, 2))
+    return outer_radius > (d + inner_radius)
 
 BASE_SIZE = (640, 480)
 PI = 3.1415

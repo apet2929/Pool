@@ -6,11 +6,12 @@ from states.state import State
 from pygame import Rect, Vector2
 import pygame
 
-from utils import BASE_SIZE, check_sides, circle_intersection, normalize_angle_rads
+from utils import BASE_SIZE, check_sides, circle_intersection, is_circle_inside_circle, normalize_angle_rads
 
 class Ball(Entity):
     FRICTION = 0.02
     RADIUS = 15
+    HOLE_RADIUS = 20
     def __init__(self, image: pygame.Surface, position, mass=1) -> None:
         super().__init__(image, (Ball.RADIUS * 2, Ball.RADIUS * 2), position)
         self.mass: float = mass
@@ -60,6 +61,12 @@ class Ball(Entity):
 
     def get_pos_at_time(self, delta) -> Vector2:
         return self.position + (self.velocity * delta)
+
+    def check_sunk(self, holes: list[tuple]) -> bool:
+        for hole in holes:
+            if is_circle_inside_circle((self.position.x, self.position.y), Ball.RADIUS, hole, Ball.HOLE_RADIUS):
+                return True
+        return False
 
     def collide_walls(self, delta, walls: list[Rect]):
         # Check for collision next frame
@@ -137,6 +144,7 @@ class Ball(Entity):
         other.velocity = ovn_vector + ovt_vector
 
     def fix_intersection(self, ball):
+        return
         difference: Vector2 = self.position - ball.position
         optimal_difference = difference.normalize() * Ball.RADIUS * 2
         # Push both balls out
@@ -158,14 +166,19 @@ class PoolGameState(State):
         self.balls: list[Ball] = []
         self.aim: Vector2 = None
         self.walls: list[Rect] = []
+        self.holes: list[tuple] = []
+        self.bg_color = (42, 102, 55)
+        self.wall_color = (79, 51, 16)
 
     def on_enter(self, ass_cache: AssetCache):
         self.init_balls(ass_cache)
-        # self.balls[0].apply_force(Vector2(10, 10))
         self.init_walls()
+        self.init_holes()
 
-    def render(self, screen):
-        screen.fill((0,0,0))
+    def render(self, screen: pygame.Surface):
+        screen.fill(self.bg_color)
+
+        self.draw_holes(screen)
         for ball in self.balls:
             ball.render(screen)
 
@@ -199,6 +212,8 @@ class PoolGameState(State):
         
         for ball in self.balls:
             ball.update(delta, walls=self.walls, balls=self.balls)
+            if ball.check_sunk(self.holes):
+                self.balls.remove(ball)
     
     def getCueBall(self) -> Ball:
         return self.balls[0]
@@ -238,10 +253,25 @@ class PoolGameState(State):
             Ball(ass_cache.get_asset("CropSprite"), (3*w/4 + 4*d, h/2 - 2*d)),
         ]
         self.balls.extend(balls)
+    
+    def init_holes(self):
+        r = Ball.HOLE_RADIUS
+        margin = 5
+        rm = r + margin
+        w = BASE_SIZE[0]
+        h = BASE_SIZE[1]
+        self.holes = [
+            (rm, rm), (w - rm, rm), (w - rm, h - rm), (rm, h - rm),
+            (w/2, rm), (w/2, h - rm)
+        ]
 
     def draw_walls(self, screen):
         for wall in self.walls:
-            pygame.draw.rect(screen, (0,255,0), wall)
+            pygame.draw.rect(screen, self.wall_color, wall)
+
+    def draw_holes(self, screen):
+        for hole in self.holes:
+            pygame.draw.circle(screen, (0,0,0), hole, Ball.HOLE_RADIUS)
 
     def run_test(self, launch_angle):
         a = math.radians(launch_angle)
