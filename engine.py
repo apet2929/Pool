@@ -10,8 +10,6 @@ import pygame.rect
 import pygame.surface
 import pygame.time
 from pygame.color import Color
-from entitites.entity import Entity
-from states.fall_game_state import FallGameState
 from states.pool_game_state import PoolGameState
 import ui
 from assets import AssetCache
@@ -20,27 +18,9 @@ from states.state_manager import GameStateManager
 from states.title_state import TitleState
 from states.transition_state import TransitionState
 from utils import BASE_SIZE
-from pygame import Vector2
+
 
 pygame.init()
-
-class TestState(State):
-    def __init__(self) -> None:
-        self.bgcol = Color(
-            random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
-        )
-
-    def render(self, screen: pygame.Surface):
-        screen.fill(self.bgcol)
-
-    def on_enter(self):
-        print(f"State {self.bgcol} on_enter()")
-
-    def on_exit(self):
-        print(f"State {self.bgcol} on_exit()")
-
-    def __repr__(self) -> str:
-        return f"State {self.bgcol}"
 
 class Game:
     def __init__(self) -> None:
@@ -55,7 +35,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = ui.Font(20, BASE_SIZE[0], False, False)
         self.gsm = GameStateManager()
-        self.gsm.push(PoolGameState(), self.asset_cache)
+        title = TitleState(BASE_SIZE, self.font, self.play, self.quit)
+        self.gsm.push(title, self.asset_cache)
 
 
     def run(self):
@@ -78,8 +59,6 @@ class Game:
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_RETURN:
                     self.transition()
-                if event.key == pygame.K_RSHIFT:
-                    self.transition(TestState())
                 if event.key == pygame.K_0:
                     for i, state in enumerate(self.gsm.states):
                         print(i, state)
@@ -89,7 +68,7 @@ class Game:
 
     def play(self):
         print("Playing Game!")
-        self.transition(TestState())
+        self.transition(PoolGameState())
 
     def quit(self):
         print("Quitting")
@@ -118,7 +97,7 @@ class Game:
 
         self.gsm.push(
             TransitionState(
-                fade_in_done, 2, (0, 0, 0), self.screen.get_size(), TransitionState.IN
+                fade_in_done, 1.5, (0, 0, 0), self.screen.get_size(), TransitionState.IN
             ), self.asset_cache
         )
 

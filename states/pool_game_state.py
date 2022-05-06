@@ -33,6 +33,9 @@ class Ball(Entity):
     def get_momentum(self):
         return self.mass * self.velocity
 
+    def is_moving(self):
+        return self.velocity.magnitude_squared() > 0.001
+
     def apply_force(self, force: Vector2):
         self.forces.append(force)
 
@@ -115,10 +118,10 @@ class Ball(Entity):
         if future_rect.colliderect(ball_rect): # Fast rectangle collision test
             return circle_intersection(future_pos, ball.get_pos_after_time(delta), Ball.RADIUS)
         return False
-                        
+
     def get_intersection_time(self, ball, delta) -> float or None:
         return self.sweep_circle(delta, ball) # Potentially really expensive, we'll see!
-                                    
+
     def collide_ball(self, other):
         difference: Vector2 = self.position - other.position
         unit_normal = difference.normalize()
@@ -177,6 +180,13 @@ class PoolGameState(State):
         self.table_color = (42, 102, 55)
         self.bg_color = (80, 101, 148)
         self.wall_color = (79, 51, 16)
+        self.states = {
+            "INACTIVE": 0,
+            "AIMING": 1,
+            "SCRATCH": 2,
+            "WIN": 3
+        }
+        self.state = self.states["AIMING"]
 
     def on_enter(self, ass_cache: AssetCache):
         self.init_balls(ass_cache)
@@ -200,10 +210,22 @@ class PoolGameState(State):
 
     def update(self, delta, events):
         keys = pygame.key.get_pressed()
+        if self.state == self.states["AIMING"]:
+                self.updateAim(events)
+        elif self.state == self.states["INACTIVE"]:
+            self.updateInactive()
+        
+        
+        for ball in self.balls:
+            ball.update(delta, walls=self.walls, balls=self.balls)
+            if ball.check_sunk(self.holes):
+                self.balls.remove(ball)
+
+    def updateAim(self, events: list[pygame.event.Event]):
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-                self.aim = Vector2(pos[0], pos[1])
+                    pos = pygame.mouse.get_pos()
+                    self.aim = Vector2(pos[0], pos[1])
             if event.type == pygame.MOUSEMOTION:
                 if pygame.mouse.get_pressed()[0]:
                     pos = pygame.mouse.get_pos()
@@ -214,15 +236,17 @@ class PoolGameState(State):
                 difference *= 2
                 self.getCueBall().apply_force(difference * self.getCueBall().mass)
                 self.aim = None
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_o:
-                    self.run_test(180)
-        
+                self.state = self.states["INACTIVE"]
+
+    def updateInactive(self):
+        doneWaiting = True
         for ball in self.balls:
-            ball.update(delta, walls=self.walls, balls=self.balls)
-            if ball.check_sunk(self.holes):
-                self.balls.remove(ball)
-    
+            if ball.is_moving():
+                doneWaiting = False
+        if doneWaiting:
+            self.state = self.states["AIMING"]
+            print("Done waiting")
+
     def getCueBall(self) -> Ball:
         return self.balls[0]
 

@@ -378,6 +378,7 @@ class Font:
         return self.value.render(text, antialias, color)
 
 class Text:
+    
     def __init__(self, text, screen_size, center_pos, f: Font, color) -> None:
         self.text = text
         self.font = f
