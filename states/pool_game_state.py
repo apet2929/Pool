@@ -208,6 +208,7 @@ class PoolGameState(State):
             Text("You scratched! Place the ball with LEFT CLICK", BASE_SIZE, (50, 5), self.font, (self.wall_color)),
             Text("You win!", BASE_SIZE, (50, 5), self.font, (self.wall_color))
         ]
+        self.updateBalls(0)
 
     def render(self, screen: pygame.Surface):
         self.draw_background(screen)
@@ -247,7 +248,6 @@ class PoolGameState(State):
     def updateAim(self, events: list[pygame.event.Event]):
         for event in events:
             if event.type == pygame.MOUSEMOTION:
-                print("Aiming")
                 mousePos = pygame.mouse.get_pos()
                 self.aim = Vector2(mousePos[0] - self.getCueBall().position.x, mousePos[1] - self.getCueBall().position.y).normalize()
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -277,8 +277,9 @@ class PoolGameState(State):
                 self.getCueBall().setPosition(Vector2(mPos[0], mPos[1]))
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mPos = pygame.mouse.get_pos()
-                self.getCueBall().setPosition(Vector2(mPos[0], mPos[1]))
-                self.state = self.states["AIMING"]
+                if mPos[1] > self.walls[0].bottom + Ball.RADIUS and mPos[1] < self.walls[1].top - Ball.RADIUS:
+                    self.getCueBall().setPosition(Vector2(mPos[0], mPos[1]))
+                    self.state = self.states["AIMING"]
 
     def updateInactive(self, delta):
         self.updateBalls(delta)
