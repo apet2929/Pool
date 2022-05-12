@@ -12,10 +12,7 @@ class State:
         pass
 
     def render(self, screen):
-        for text in self.texts:
-            text.draw(screen)
-        for button in self.buttons:
-            button.draw(screen)
+        pass
     
     def on_enter(self, asset_cache:AssetCache):
         """

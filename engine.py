@@ -68,7 +68,7 @@ class Game:
 
     def play(self):
         print("Playing Game!")
-        self.transition(PoolGameState())
+        self.transition(PoolGameState(self.font))
 
     def quit(self):
         print("Quitting")

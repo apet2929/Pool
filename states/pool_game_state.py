@@ -5,6 +5,7 @@ from entitites.entity import Entity
 from states.state import State
 from pygame import Rect, Surface, Vector2
 import pygame
+from ui import Text
 
 from utils import BASE_SIZE, check_sides, circle_intersection, is_circle_inside_circle, normalize_angle_rads
 
@@ -34,7 +35,7 @@ class Ball(Entity):
         return self.mass * self.velocity
 
     def is_moving(self):
-        return self.velocity.magnitude_squared() > 0.001
+        return self.velocity.magnitude_squared() > 0.05
 
     def apply_force(self, force: Vector2):
         self.forces.append(force)
@@ -169,10 +170,15 @@ def draw_ball(color) -> Surface:
     return surf
 
 class PoolGameState(State):
-    def __init__(self) -> None:
+    POWER_MIN = 1
+    POWER_MAX = 100
+    def __init__(self, font) -> None:
         super().__init__()
+        self.font = font
         self.balls: list[Ball] = []
-        self.aim: Vector2 = None
+        self.aim: Vector2 = Vector2(100, 0)
+        self.power: float = 1
+        self.mousePos_i = None
         self.walls: list[Rect] = []
         self.holes: list[tuple] = []
 
@@ -183,8 +189,9 @@ class PoolGameState(State):
         self.states = {
             "INACTIVE": 0,
             "AIMING": 1,
-            "SCRATCH": 2,
-            "WIN": 3
+            "POWER": 2,
+            "SCRATCH": 3,
+            "WIN": 4
         }
         self.state = self.states["AIMING"]
 
@@ -192,6 +199,9 @@ class PoolGameState(State):
         self.init_balls(ass_cache)
         self.init_walls()
         self.init_holes()
+        self.texts = [
+            Text("Waiting...", BASE_SIZE, (50, 5), self.font, (self.wall_color))
+        ]
 
     def render(self, screen: pygame.Surface):
         self.draw_background(screen)
@@ -201,43 +211,63 @@ class PoolGameState(State):
             ball.render(screen)
 
         self.draw_walls(screen)            
-        self.draw_line(screen)
+        self.drawAim(screen)
+        self.draw_ui(screen)
         super().render(screen)
     
-    def draw_line(self, screen):
+    def drawAim(self, screen):
         if self.aim is not None:
-            pygame.draw.line(screen, (255,0,0), self.getCueBall().position, self.aim)
+            pointA = self.getCueBall().position - (self.aim * (Ball.RADIUS * 2 + self.power))
+            pointB = self.getCueBall().position - (self.aim * (Ball.RADIUS * 12 + self.power))
+            pygame.draw.line(screen, (255,0,0), pointA, pointB)
 
     def update(self, delta, events):
         keys = pygame.key.get_pressed()
         if self.state == self.states["AIMING"]:
-                self.updateAim(events)
+            self.updateAim(events)
+        elif self.state == self.states["POWER"]:
+            self.updatePower(events)
         elif self.state == self.states["INACTIVE"]:
             self.updateInactive()
-        
         
         for ball in self.balls:
             ball.update(delta, walls=self.walls, balls=self.balls)
             if ball.check_sunk(self.holes):
                 self.balls.remove(ball)
 
+    def shoot(self):
+        self.getCueBall().apply_force(self.aim * self.power * self.getCueBall().mass * 10)
+        self.aim = None
+        self.power = 1
+        self.state = self.states["INACTIVE"]
+
     def updateAim(self, events: list[pygame.event.Event]):
         for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
-                    self.aim = Vector2(pos[0], pos[1])
             if event.type == pygame.MOUSEMOTION:
-                if pygame.mouse.get_pressed()[0]:
-                    pos = pygame.mouse.get_pos()
-                    self.aim = Vector2(pos[0], pos[1])
-            
-            if event.type == pygame.MOUSEBUTTONUP:
-                difference =  self.aim - self.getCueBall().position
-                difference *= 2
-                self.getCueBall().apply_force(difference * self.getCueBall().mass)
-                self.aim = None
-                self.state = self.states["INACTIVE"]
+                print("Aiming")
+                mousePos = pygame.mouse.get_pos()
+                self.aim = Vector2(mousePos[0] - self.getCueBall().position.x, mousePos[1] - self.getCueBall().position.y).normalize()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.state = self.states["POWER"]
+                self.mousePos_i = pygame.mouse.get_pos()
+                
 
+    def updatePower(self, events: list[pygame.event.Event]):
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONUP:
+                print(f"power = {self.power}")
+                self.shoot()
+            elif event.type == pygame.MOUSEMOTION:
+                mousePos = pygame.mouse.get_pos()
+                difference = Vector2(mousePos[0] - self.mousePos_i[0], mousePos[1] - self.mousePos_i[1])
+                mag = -difference.magnitude()
+                if mag == 0:
+                    intendedPower = 0
+                else:
+                    difference.normalize_ip()
+                    intendedPower = difference.dot(self.aim) * mag
+                self.power = min(max(intendedPower, PoolGameState.POWER_MIN), PoolGameState.POWER_MAX)
+       
     def updateInactive(self):
         doneWaiting = True
         for ball in self.balls:
@@ -308,6 +338,10 @@ class PoolGameState(State):
     def draw_background(self, screen: Surface):
         screen.fill(self.bg_color)
         screen.fill(self.table_color, self.table)
+
+    def draw_ui(self, screen):
+        if self.state == self.states["INACTIVE"]:
+            self.texts[0].draw(screen)
 
     def run_test(self, launch_angle):
         a = math.radians(launch_angle)
